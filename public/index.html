@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DDN Transfer</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-mark">ДДН</div>
+      <div>
+        <div class="eyebrow">Дом дружбы народов</div>
+        <h1>Перенос публикаций</h1>
+      </div>
+      <div class="auth-box">
+        <span class="auth-state"><i id="authDot"></i><span id="authText">Проверяем вход…</span></span>
+        <button id="authButton" class="button button-quiet" type="button">Войти в EISRF</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="step">Новая публикация</span>
+        <h2>Вставьте ссылку.<br><em>Остальное — автоматически.</em></h2>
+        <p>Сервис перенесёт заголовок, дату, текст, главное изображение и фотогалерею на новый сайт.</p>
+      </div>
+
+      <form id="transferForm" class="transfer-card">
+        <label for="sourceUrl">Ссылка на материал с ddnmgn.ru</label>
+        <div class="url-row">
+          <span class="link-icon" aria-hidden="true">↗</span>
+          <input id="sourceUrl" name="sourceUrl" type="url" required
+            placeholder="https://ddnmgn.ru/novosti/…" autocomplete="off">
+        </div>
+        <div class="hint-row">
+          <span>Новости, статьи и фотоальбомы</span>
+          <span>До 150 фотографий</span>
+        </div>
+        <button id="transferButton" class="button button-primary" type="submit">
+          <span>Перенести на новый сайт</span><b aria-hidden="true">→</b>
+        </button>
+      </form>
+    </section>
+
+    <section id="statusPanel" class="status-panel" hidden>
+      <div class="status-head">
+        <div>
+          <span class="step">Ход выполнения</span>
+          <h3 id="statusTitle">Подготавливаем материал</h3>
+        </div>
+        <strong id="progressText">0%</strong>
+      </div>
+      <div class="progress"><div id="progressBar"></div></div>
+      <p id="statusMessage" class="status-message"></p>
+      <div id="result" class="result" hidden></div>
+      <details class="log-details">
+        <summary>Технический журнал</summary>
+        <ol id="logList"></ol>
+      </details>
+    </section>
+
+    <footer>
+      <span>Источник</span><a href="https://ddnmgn.ru/" target="_blank" rel="noreferrer">ddnmgn.ru</a>
+      <i>→</i>
+      <span>Назначение</span><a href="https://ddn-mgn.chel.muzkult.ru/news" target="_blank" rel="noreferrer">muzkult.ru</a>
+    </footer>
+  </main>
+  <div id="toast" class="toast" role="alert"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
