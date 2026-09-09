@@ -87,8 +87,13 @@ app.post('/api/transfers', async (req, res) => {
     const byUrl = new Map(allUrls.map((url, index) => [url, files[index]]));
     const mainImagePath = source.mainImageUrl ? byUrl.get(source.mainImageUrl) : null;
     const galleryFiles = galleryUrls.map(url => byUrl.get(url)).filter(Boolean);
-    const videoFiles = await downloadVideos(videoUrls, videoDir, (done, total) => {
-      report(`Скачано видео: ${done} из ${total}`, 46 + Math.round((done / total) * 8));
+    const videoFiles = await downloadVideos(videoUrls, videoDir, (done, total, state) => {
+      const progress = 46 + Math.round((done / total) * 8);
+      if (state?.skipped) {
+        report(`Видео пропущено (${done} из ${total}): ${state.error}`, progress);
+      } else {
+        report(`Скачано видео: ${done} из ${total}`, progress);
+      }
     });
 
     const result = await transferToTarget({ source, mainImagePath, galleryFiles, videoFiles, report });

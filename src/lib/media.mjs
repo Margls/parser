@@ -53,9 +53,18 @@ export async function downloadImages(urls, outputDir, onProgress = () => {}) {
 
 export async function downloadVideos(urls, outputDir, onProgress = () => {}) {
   if (!urls.length) return [];
-  await fs.access(YT_DLP_PATH).catch(() => {
-    throw new Error('Не найден tools/yt-dlp.exe — загрузчик видео не установлен');
-  });
+  try {
+    await fs.access(YT_DLP_PATH);
+  } catch {
+    urls.forEach((url, index) => {
+      onProgress(index + 1, urls.length, {
+        skipped: true,
+        url,
+        error: 'не найден tools/yt-dlp.exe — загрузчик видео не установлен',
+      });
+    });
+    return [];
+  }
   await fs.mkdir(outputDir, { recursive: true });
   const files = [];
 
@@ -92,10 +101,14 @@ export async function downloadVideos(urls, outputDir, onProgress = () => {}) {
         throw new Error(`минимальная доступная версия видео больше 3 МБ (${(stat.size / 1024 / 1024).toFixed(1)} МБ)`);
       }
       files.push(outputPath);
-      onProgress(index + 1, urls.length);
+      onProgress(index + 1, urls.length, { skipped: false, url: urls[index], file: outputPath });
     } catch (error) {
       const details = String(error.stderr || error.message || error).trim().split(/\r?\n/).at(-1);
-      throw new Error(`Не удалось скачать видео ${urls[index]}: ${details}`);
+      onProgress(index + 1, urls.length, {
+        skipped: true,
+        url: urls[index],
+        error: details,
+      });
     }
   }
   return files;
