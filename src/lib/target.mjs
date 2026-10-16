@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { AUTH_STATE } from '../config.mjs';
+import { buildNewsHtml } from './news-template.mjs';
 
 const SITE_ID = '140990246';
 const BASE = `https://lk.eisrf.ru/user/cp/${SITE_ID}`;
@@ -218,16 +219,17 @@ export async function transferToTarget({ source, mainImagePath, galleryFiles, vi
       report(`Загружаем видео ${index + 1} из ${videoFiles.length}`, 87 + Math.round(((index + 1) / videoFiles.length) * 5));
       uploadedVideos.push(await uploadContentFile(page, videoFiles[index]));
     }
-    const previewHtml = previewImageUrl
-      ? `<img src="${escapeAttribute(previewImageUrl)}" alt="${escapeAttribute(source.title)}" style="max-width: 100%; height: auto;"><br><br>`
-      : '';
     const videoHtml = uploadedVideos.map(video => {
       const extension = path.extname(video.filename).toLowerCase();
       const mimeType = extension === '.webm' ? 'video/webm' : extension === '.mov' ? 'video/quicktime' : 'video/mp4';
       const url = escapeAttribute(video.url);
       return `<video controls preload="metadata" style="max-width: 100%; height: auto;"><source src="${url}" type="${mimeType}"><a href="${url}">Скачать видео</a></video><br><br>`;
     }).join('\n');
-    const contentHtml = `${previewHtml}${videoHtml}${source.contentHtml || ''}`;
+    const contentHtml = buildNewsHtml({
+      source,
+      previewImageUrl,
+      videoHtml,
+    });
     await page.waitForFunction(() => window.tinymce?.get('o1-text'), null, { timeout: 30_000 });
     await page.evaluate(html => {
       const editor = window.tinymce.get('o1-text');
