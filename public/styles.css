@@ -64,6 +64,12 @@ body {
 .button-primary:hover { background: var(--red-dark); transform: translateY(-2px); box-shadow: 0 16px 30px rgba(227,38,79,.28); }
 .button-primary b { font-size: 21px; }
 
+.tabs { display: flex; gap: 8px; margin: 8px 0 20px; }
+.tab { padding: 12px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--muted); font: inherit; font-weight: 750; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: white; }
+.tab:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
+.tab:disabled { cursor: wait; opacity: .6; }
+
 .status-panel { margin-top: 24px; padding: 32px 36px; background: var(--paper); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 14px 45px rgba(23,32,51,.06); }
 .status-head { display: flex; justify-content: space-between; align-items: end; }
 .status-head h3 { margin: 6px 0 0; font-size: 23px; }

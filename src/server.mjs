@@ -7,7 +7,7 @@ import { chromium } from 'playwright';
 import { AUTH_DIR, AUTH_STATE, LOGIN_URL, ROOT_DIR } from './config.mjs';
 import { downloadImages, downloadVideos } from './lib/media.mjs';
 import { extractSource } from './lib/source.mjs';
-import { transferToTarget } from './lib/target.mjs';
+import { transferAlbumToTarget, transferToTarget } from './lib/target.mjs';
 
 const app = express();
 const jobs = new Map();
@@ -49,7 +49,8 @@ app.post('/api/auth', async (_req, res) => {
   }
 });
 
-app.post('/api/transfers', async (req, res) => {
+app.post(['/api/transfers', '/api/albums'], async (req, res) => {
+  const albumOnly = req.path === '/api/albums';
   const sourceUrl = String(req.body?.sourceUrl || '').trim();
   if (!sourceUrl) return res.status(400).json({ error: 'Вставьте ссылку на материал' });
   if (!(await hasAuth())) return res.status(401).json({ error: 'Сначала войдите в EISRF' });
@@ -58,7 +59,7 @@ app.post('/api/transfers', async (req, res) => {
   }
 
   const id = crypto.randomUUID();
-  const job = { id, status: 'running', progress: 2, message: 'Начинаем перенос', logs: [], result: null, error: null };
+  const job = { id, kind: albumOnly ? 'photo-album' : 'publication', status: 'running', progress: 2, message: 'Начинаем перенос', logs: [], result: null, error: null };
   jobs.set(id, job);
   res.status(202).json({ id });
 
@@ -72,6 +73,26 @@ app.post('/api/transfers', async (req, res) => {
   try {
     report('Читаем страницу-источник', 8);
     const source = await extractSource(sourceUrl);
+    if (albumOnly) {
+      if (!source.title) throw new Error('Не удалось определить название альбома');
+      const result = await transferAlbumToTarget({
+        source,
+        report,
+        prepareFiles: async () => {
+          jobDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ddn-album-transfer-'));
+          const urls = [...new Set(source.galleryUrls)].slice(0, 150);
+          report(`Подготавливаем фотографии альбома: ${urls.length}`, 20);
+          return downloadImages(urls, path.join(jobDir, 'images'), (done, total) => {
+            report(`Скачано и оптимизировано изображений: ${done} из ${total}`, 20 + Math.round((done / total) * 25));
+          });
+        },
+      });
+      job.result = { ...result, title: source.title, kind: 'photo-album' };
+      job.message = result.existed ? 'Альбом существует' : 'Готово — альбом создан';
+      job.progress = 100;
+      job.status = 'completed';
+      return;
+    }
     if (!source.title || !source.contentHtml) throw new Error('Не удалось выделить заголовок или содержимое страницы');
 
     jobDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ddn-news-transfer-'));

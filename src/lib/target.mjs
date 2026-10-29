@@ -3,6 +3,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { AUTH_STATE } from '../config.mjs';
 import { buildNewsHtml } from './news-template.mjs';
+import { findPublicAlbumUrl } from './public-album.mjs';
 
 const SITE_ID = '140990246';
 const BASE = `https://lk.eisrf.ru/user/cp/${SITE_ID}`;
@@ -124,19 +125,41 @@ async function saveAndWait(page) {
 
 async function findAlbum(page, title) {
   await page.goto(`${BASE}/albums`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('table[role="table2"] tbody', { timeout: 30_000 });
-  return page.locator('tbody tr').evaluateAll((rows, expected) => {
-    const row = rows.find(item => item.querySelector('.fld-title')?.textContent.trim() === expected);
-    if (!row) return null;
-    const href = row.querySelector('a[role="edit"]')?.href;
-    const id = row.dataset.id;
-    return href && id ? { href, id } : null;
-  }, title);
+  if (new URL(page.url()).pathname.startsWith('/user/login')) throw new Error('Сессия EISRF истекла. Выполните вход повторно');
+  await page.waitForSelector('table[role="table2"] tbody', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(() => window.qwx?.table2?.get?.().some(item => item.table?.is('[role="table2"]')), null, { timeout: 30_000 });
+  // Walk every page: looking only at the first page can create duplicates.
+  for (;;) {
+    const album = await page.locator('table[role="table2"] tbody tr').evaluateAll((rows, expected) => {
+      const normalize = value => value.normalize('NFC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru-RU');
+      const row = rows.find(item => normalize(item.querySelector('.fld-title')?.textContent || '') === normalize(expected));
+      if (!row) return null;
+      const href = row.querySelector('a[role="edit"]')?.href;
+      const id = row.dataset.id;
+      if (!href || !id) throw new Error('Альбом найден, но EISRF не вернул ссылку на него');
+      return { href, id };
+    }, title);
+    if (album) return album;
+
+    const advanced = await page.evaluate(() => new Promise((resolve, reject) => {
+      const table = window.qwx?.table2?.get?.().find(item => item.table?.is('[role="table2"]'));
+      if (!table?.pager) return reject(new Error('Не удалось проверить все страницы альбомов EISRF'));
+      if (table.pager.current >= table.pager.last_page) return resolve(false);
+      const timer = setTimeout(() => reject(new Error('Не удалось загрузить следующую страницу альбомов EISRF')), 30_000);
+      table.pageLoad(table.pager.current + 1, { skip_pushState: true }, () => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+    }));
+    if (!advanced) return null;
+  }
 }
 
-async function createAlbum(page, source, files, report) {
+async function createAlbum(page, source, files, report, { stopIfExists = false } = {}) {
   let album = await findAlbum(page, source.title);
+  const existed = Boolean(album);
   if (album) {
+    if (stopIfExists) return { ...album, existed };
     report(`Альбом уже существует, продолжаем загрузку: ${source.title}`, 58);
   } else {
     report('Создаём альбом в галерее', 55);
@@ -168,7 +191,33 @@ async function createAlbum(page, source, files, report) {
     await input.setInputFiles(batch);
     await page.waitForFunction(count => document.querySelectorAll('.dz-success').length >= count, batch.length, { timeout: 180_000 });
   }
-  return albumId;
+  return { ...album, existed };
+}
+
+export async function transferAlbumToTarget({ source, prepareFiles, report }) {
+  await fs.access(AUTH_STATE).catch(() => { throw new Error('Сначала выполните вход в EISRF'); });
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ ignoreHTTPSErrors: true, storageState: AUTH_STATE });
+    const page = await context.newPage();
+    report('Проверяем, существует ли альбом на новом сайте', 15);
+    let album = await findAlbum(page, source.title);
+    let images = 0;
+    if (album) {
+      album.existed = true;
+    } else {
+      if (!source.galleryUrls.length) throw new Error('На странице не найдены фотографии альбома');
+      const files = await prepareFiles();
+      if (!files.length) throw new Error('Не удалось подготовить фотографии альбома');
+      album = await createAlbum(page, source, files, report, { stopIfExists: true });
+      images = album.existed ? 0 : files.length;
+    }
+    report('Проверяем ссылку на альбом на публичном сайте', 95);
+    const publicUrl = await findPublicAlbumUrl(browser, source.title, report);
+    return { albumId: album.id, albumUrl: album.href, adminUrl: album.href, publicUrl, existed: album.existed, images };
+  } finally {
+    await browser.close();
+  }
 }
 
 async function duplicateNews(page, title) {
@@ -202,7 +251,7 @@ export async function transferToTarget({ source, mainImagePath, galleryFiles, vi
     if (await duplicateNews(page, source.title)) throw new Error('Новость с таким названием уже существует на новом сайте');
 
     let albumId = null;
-    if (galleryFiles.length) albumId = await createAlbum(page, source, galleryFiles, report);
+    if (galleryFiles.length) albumId = (await createAlbum(page, source, galleryFiles, report)).id;
 
     report('Заполняем новую публикацию', 86);
     await page.goto(`${BASE}/news/new/edit`, { waitUntil: 'domcontentloaded' });

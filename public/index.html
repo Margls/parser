@@ -20,22 +20,27 @@
       </div>
     </header>
 
-    <section class="hero">
+    <nav class="tabs" role="tablist" aria-label="Тип переноса">
+      <button id="publicationTab" class="tab" role="tab" type="button" aria-selected="true" aria-controls="transferPanel" data-mode="publication">Публикации</button>
+      <button id="albumTab" class="tab" role="tab" type="button" aria-selected="false" aria-controls="transferPanel" tabindex="-1" data-mode="album">Фотоальбом</button>
+    </nav>
+
+    <section id="transferPanel" class="hero" role="tabpanel" aria-labelledby="publicationTab">
       <div class="hero-copy">
-        <span class="step">Новая публикация</span>
+        <span id="transferStep" class="step">Новая публикация</span>
         <h2>Вставьте ссылку.<br><em>Остальное — автоматически.</em></h2>
-        <p>Сервис перенесёт заголовок, дату, текст, главное изображение и фотогалерею на новый сайт.</p>
+        <p id="transferDescription">Сервис перенесёт заголовок, дату, текст, главное изображение и фотогалерею на новый сайт.</p>
       </div>
 
       <form id="transferForm" class="transfer-card">
-        <label for="sourceUrl">Ссылка на материал с ddnmgn.ru</label>
+        <label id="sourceLabel" for="sourceUrl">Ссылка на материал с ddnmgn.ru</label>
         <div class="url-row">
           <span class="link-icon" aria-hidden="true">↗</span>
           <input id="sourceUrl" name="sourceUrl" type="url" required
             placeholder="https://ddnmgn.ru/novosti/…" autocomplete="off">
         </div>
         <div class="hint-row">
-          <span>Новости, статьи и фотоальбомы</span>
+          <span id="sourceHint">Новости, статьи и фотоальбомы</span>
           <span>До 150 фотографий</span>
         </div>
         <button id="transferButton" class="button button-primary" type="submit">
